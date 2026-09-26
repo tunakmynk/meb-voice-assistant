@@ -1,0 +1,27 @@
+menu "MEB Sesli Asistan"
+
+config MEB_WIFI_SSID
+    string "Wi-Fi ağ adı (SSID)"
+    default ""
+    help
+        İlk açılışta NVS boşsa buradaki değer NVS'e yazılır ve cihaz onunla
+        bağlanır. Dokunmatik kurulum ekranı (3.5b) geldiğinde ekrandan
+        girilen değer bunun üzerine yazar.
+
+        Bu değer sdkconfig'e gider; sdkconfig .gitignore'da olduğu için
+        depoya girmez.
+
+config MEB_WIFI_PASSWORD
+    string "Wi-Fi parolası"
+    default ""
+    help
+        Açık ağ için boş bırakın.
+
+config MEB_BACKEND_URL
+    string "Backend WebSocket adresi"
+    default "ws://192.168.1.100:8000/ws"
+    help
+        Dizüstünüzün yerel ağdaki IP'si. Demo günü değişebilir — ADR-09
+        gereği ekrandan da değiştirilebilecek (R-01 yedek yolu).
+
+endmenu

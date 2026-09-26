@@ -1,0 +1,3 @@
+# Yalnizca scripts/ingest_qdrant.py icin. Backend calisirken gerekmez —
+# runtime'da parquet okumuyoruz, Qdrant'a soruyoruz.
+pyarrow>=18

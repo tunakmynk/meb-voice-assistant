@@ -1,0 +1,22 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# fastembed model önbelleği
+.fastembed_cache/
+local_cache/
+
+# firmware
+firmware/build/
+firmware/sdkconfig.old
+
+# Üretilen vektör verisi — veri hattı yeniden üretebiliyor,
+# ayrıca ders kitabı metinlerini içerdiği için depoda tutulmuyor.
+vectors/
+
+# Demo videosu portfolyo sitesinde duruyor
+*.mp4
+
+.pytest_cache/

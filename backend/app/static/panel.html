@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MEB Sesli Asistan · Panel</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --zemin: #0F1115; --kart: #171A21; --cizgi: #2A303D;
+    --metin: #E6E8EE; --soluk: #8B93A7;
+    --mavi: #4C8DFF; --yesil: #35C46A; --sari: #F0B849; --kirmizi: #FF6B6B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--zemin); color: var(--metin);
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 20px; border-bottom: 1px solid var(--cizgi);
+    position: sticky; top: 0; background: var(--zemin); z-index: 2;
+  }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .rozet {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--soluk);
+  }
+  .nokta {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--soluk);
+  }
+  .nokta.acik { background: var(--yesil); }
+  .bosluk { flex: 1; }
+  button, select, input[type=number] {
+    background: var(--kart); color: var(--metin);
+    border: 1px solid var(--cizgi); border-radius: 7px;
+    padding: 6px 11px; font-size: 13px; font-family: inherit;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--mavi); }
+  button.birincil { background: var(--mavi); color: var(--zemin); border: 0; font-weight: 600; }
+
+  main {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px; padding: 16px 20px 40px; align-items: start;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  section { background: var(--kart); border-radius: 10px; padding: 14px 16px; }
+  section > h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--soluk); margin: 0 0 12px; font-weight: 600;
+  }
+
+  .soru { font-weight: 600; margin-bottom: 6px; }
+  .cevap { color: var(--mavi); white-space: pre-wrap; }
+  .cevap.kaynaksiz { color: var(--sari); }
+  .kaynak {
+    font-size: 12px; color: var(--soluk); margin-top: 8px;
+    border-left: 2px solid var(--cizgi); padding-left: 9px;
+  }
+  .olcum { font-size: 12px; color: var(--soluk); margin-top: 8px; }
+  .olcum b { color: var(--metin); font-weight: 600; }
+  .bos { color: var(--soluk); font-style: italic; }
+
+  ul.liste { list-style: none; margin: 0; padding: 0; }
+  ul.liste li {
+    padding: 9px 10px; border-radius: 7px; cursor: pointer;
+    display: flex; gap: 10px; align-items: baseline;
+  }
+  ul.liste li:hover { background: #1E222B; }
+  ul.liste li.secili { background: #232833; }
+  .kucuk { font-size: 12px; color: var(--soluk); }
+
+  .ayar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ayar label { width: 110px; font-size: 13px; }
+  .ayar input { width: 90px; }
+  .durum-yazi { font-size: 12px; margin-left: 4px; }
+  .tur { padding: 10px 0; border-bottom: 1px solid var(--cizgi); }
+  .tur:last-child { border-bottom: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MEB Sesli Asistan</h1>
+  <span class="rozet"><span class="nokta" id="nokta"></span><span id="cihazDurum">cihaz bekleniyor</span></span>
+  <span class="bosluk"></span>
+  <form method="post" action="/panel/logout" style="margin:0">
+    <button type="submit">Çıkış</button>
+  </form>
+</header>
+
+<main>
+  <!-- Canlı akış: turu BİTMEDEN görmek panelin asıl değeri -->
+  <section>
+    <h2>Canlı</h2>
+    <div id="canli"><span class="bos">Henüz soru sorulmadı.</span></div>
+  </section>
+
+  <section>
+    <h2>Ayarlar</h2>
+    <div class="ayar">
+      <label for="top_k">Kaynak sayısı</label>
+      <input type="number" id="top_k" min="1" max="10" step="1">
+      <span class="kucuk">1–10</span>
+    </div>
+    <div class="ayar">
+      <label for="temperature">Sıcaklık</label>
+      <input type="number" id="temperature" min="0" max="1.5" step="0.1">
+      <span class="kucuk">0–1.5</span>
+    </div>
+    <div class="ayar">
+      <label for="max_tokens">Cevap uzunluğu</label>
+      <input type="number" id="max_tokens" min="64" max="1200" step="32">
+      <span class="kucuk">token</span>
+    </div>
+    <button class="birincil" id="kaydet">Uygula</button>
+    <span class="durum-yazi" id="ayarDurum"></span>
+    <div class="kucuk" style="margin-top:12px" id="modeller"></div>
+  </section>
+
+  <section>
+    <h2>Sohbetler</h2>
+    <ul class="liste" id="sohbetler"><li class="bos">Yükleniyor…</li></ul>
+  </section>
+
+  <section>
+    <h2>Tur detayı</h2>
+    <div id="detay"><span class="bos">Soldan bir sohbet seçin.</span></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+/* ---------- Canlı akış (SSE) ---------- */
+function cihazDurumu(bagli) {
+  $('nokta').classList.toggle('acik', bagli);
+  $('cihazDurum').textContent = bagli ? 'cihaz bağlı' : 'cihaz bağlı değil';
+}
+
+let sonSoru = '';
+function canliCiz(olay) {
+  if (olay.phase === 'question') {
+    sonSoru = olay.text;
+    const ders = [olay.grade, olay.subject].filter(Boolean).join(' · ');
+    $('canli').innerHTML =
+      `<div class="soru">${esc(olay.text)}</div>` +
+      (ders ? `<div class="kucuk">${esc(ders)}</div>` : '') +
+      `<div class="kucuk" style="margin-top:8px">düşünüyor…</div>`;
+    return;
+  }
+  if (olay.phase === 'done') {
+    const g = olay.latencies_ms || {};
+    const olcum = Object.entries(g)
+      .map(([k, v]) => `${esc(k)} <b>${v} ms</b>`).join(' · ');
+    const kaynaklar = (olay.retrieved || []).map(c =>
+      `<div class="kaynak">${esc(c.breadcrumb || c.grade || 'kaynak')}` +
+      (c.score != null ? ` <span class="kucuk">(${c.score})</span>` : '') + `</div>`
+    ).join('');
+    $('canli').innerHTML =
+      `<div class="soru">${esc(sonSoru)}</div>` +
+      `<div class="cevap${olay.no_source ? ' kaynaksiz' : ''}">${esc(olay.text)}</div>` +
+      kaynaklar +
+      (olcum ? `<div class="olcum">${olcum}</div>` : '');
+    sohbetleriYukle();   // yeni tur listeye düşmüş olmalı
+  }
+}
+
+const akis = new EventSource('/panel/api/events');
+akis.onmessage = e => {
+  const olay = JSON.parse(e.data);
+  if (olay.type === 'status') cihazDurumu(olay.device === 'connected');
+  else if (olay.type === 'turn') canliCiz(olay);
+};
+akis.onerror = () => cihazDurumu(false);
+
+/* ---------- Sohbetler ---------- */
+let secili = null;
+
+async function sohbetleriYukle() {
+  const r = await fetch('/panel/api/conversations');
+  const { conversations } = await r.json();
+  if (!conversations.length) {
+    $('sohbetler').innerHTML = '<li class="bos">Henüz kayıt yok.</li>';
+    return;
+  }
+  $('sohbetler').innerHTML = conversations.map(c => {
+    const zaman = c.last_message_at
+      ? new Date(c.last_message_at).toLocaleTimeString('tr-TR',
+          { hour: '2-digit', minute: '2-digit' })
+      : '';
+    return `<li data-id="${c.id}" class="${c.id === secili ? 'secili' : ''}">
+      <span>${esc([c.grade, c.subject].filter(Boolean).join(' · ') || 'sohbet')}</span>
+      <span class="bosluk" style="flex:1"></span>
+      <span class="kucuk">${c.turns ?? 0} tur · ${zaman}</span>
+    </li>`;
+  }).join('');
+  for (const li of $('sohbetler').children) {
+    if (li.dataset.id) li.onclick = () => detayYukle(Number(li.dataset.id));
+  }
+}
+
+async function detayYukle(id) {
+  secili = id;
+  const r = await fetch(`/panel/api/conversations/${id}`);
+  const { messages } = await r.json();
+  const turlar = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.role !== 'user') continue;
+    const cevap = messages[i + 1] && messages[i + 1].role === 'assistant'
+      ? messages[i + 1] : null;
+    const g = (cevap && cevap.latencies) || {};
+    const olcum = Object.entries(g).map(([k, v]) => `${esc(k)} <b>${v} ms</b>`).join(' · ');
+    const kaynaklar = ((cevap && cevap.retrieved_chunks) || []).map(c =>
+      `<div class="kaynak">${esc(c.breadcrumb || 'kaynak')}</div>`).join('');
+    turlar.push(
+      `<div class="tur"><div class="soru">${esc(m.content)}</div>` +
+      `<div class="cevap${cevap && cevap.no_source ? ' kaynaksiz' : ''}">` +
+      `${esc(cevap ? cevap.content : '—')}</div>` +
+      kaynaklar + (olcum ? `<div class="olcum">${olcum}</div>` : '') + `</div>`);
+  }
+  $('detay').innerHTML = turlar.join('') || '<span class="bos">Bu sohbette tur yok.</span>';
+  sohbetleriYukle();
+}
+
+/* ---------- Ayarlar ---------- */
+async function ayarlariYukle() {
+  const r = await fetch('/panel/api/settings');
+  const { config } = await r.json();
+  $('top_k').value = config.top_k;
+  $('temperature').value = config.temperature;
+  $('max_tokens').value = config.max_tokens;
+  $('modeller').textContent =
+    `${config.llm_model} · ${config.stt_model} · ${config.tts_model} (${config.tts_voice})`;
+}
+
+$('kaydet').onclick = async () => {
+  const govde = {
+    top_k: Number($('top_k').value),
+    temperature: Number($('temperature').value),
+    max_tokens: Number($('max_tokens').value),
+  };
+  const r = await fetch('/panel/api/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(govde),
+  });
+  const c = await r.json();
+  const d = $('ayarDurum');
+  if (!r.ok) { d.textContent = c.error || 'hata'; d.style.color = 'var(--kirmizi)'; return; }
+  /* Ayar bir SONRAKİ turda geçerli; "kaydedildi" demek yanıltıcı olurdu. */
+  d.textContent = 'sonraki turdan itibaren geçerli';
+  d.style.color = 'var(--yesil)';
+  setTimeout(() => { d.textContent = ''; }, 4000);
+};
+
+sohbetleriYukle();
+ayarlariYukle();
+</script>
+</body>
+</html>

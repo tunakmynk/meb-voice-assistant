@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>MEB Kaynaklı RAG Destekli Sesli AI Asistan — Proje Özeti</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font: 10.5pt/1.55 "Segoe UI", system-ui, sans-serif;
+    color: #1a1d24; margin: 0;
+  }
+  h1 { font-size: 22pt; margin: 0 0 6px; letter-spacing: -.02em; }
+  h2 {
+    font-size: 14pt; margin: 26px 0 10px; padding-bottom: 5px;
+    border-bottom: 2px solid #1a1d24; letter-spacing: -.01em;
+  }
+  h3 { font-size: 11.5pt; margin: 16px 0 6px; }
+  p { margin: 0 0 9px; }
+  ul, ol { margin: 0 0 9px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  code { font: 9.5pt "Consolas", monospace; background: #f0f2f5; padding: 1px 4px; border-radius: 3px; }
+  .kapak { border-bottom: 3px solid #1a1d24; padding-bottom: 16px; margin-bottom: 4px; }
+  .altbaslik { font-size: 12pt; color: #4a5160; margin: 0 0 12px; }
+  .kunye { font-size: 9pt; color: #6b7280; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #dde1e8; vertical-align: top; }
+  th { background: #f0f2f5; font-weight: 600; }
+  td.sayi { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .kutu {
+    background: #f7f8fa; border-left: 3px solid #4C8DFF;
+    padding: 9px 13px; margin: 10px 0 14px;
+  }
+  .kutu.ders { border-left-color: #E0483D; }
+  .kutu h4 { margin: 0 0 5px; font-size: 10pt; }
+  .kutu p:last-child { margin-bottom: 0; }
+
+  .akis { display: flex; gap: 6px; align-items: stretch; margin: 12px 0 16px; flex-wrap: wrap; }
+  .adim {
+    flex: 1 1 0; min-width: 92px; background: #f0f2f5; border-radius: 6px;
+    padding: 8px 9px; font-size: 8.5pt; border-top: 3px solid #4C8DFF;
+  }
+  .adim b { display: block; font-size: 9.5pt; margin-bottom: 3px; }
+  .adim span { color: #6b7280; }
+
+  .iki { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+  .yeni-sayfa { page-break-before: always; }
+  .birlikte { page-break-inside: avoid; }
+  footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #dde1e8;
+           font-size: 8.5pt; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<div class="kapak">
+  <h1>MEB Kaynaklı, RAG Destekli Sesli AI Asistan</h1>
+  <p class="altbaslik">Öğrencinin kendi ders kitabından konuşarak cevap alabildiği bağımsız cihaz</p>
+  <p class="kunye">Staj projesi · Proje özeti ve teknik rapor</p>
+</div>
+
+<h2>1. Proje nedir</h2>
+
+<p>Öğrenci cihazdaki panele <b>basılı tutar, sorusunu sorar, bırakır.</b> Birkaç saniye
+içinde sesli cevabı duyar ve ekranda cevabın <b>hangi üniteden</b> geldiğini görür.</p>
+
+<p>Cevap genel bir dil modelinden değil, <b>öğrencinin kendi sınıfına ait MEB ders
+kitabından</b> üretilir. Konu kitapta yoksa sistem uydurmaz; bulamadığını söyler.
+Projenin ayırt edici iddiası budur: <i>doğru cevap değil, kaynağı gösterilebilir
+cevap.</i></p>
+
+<div class="kutu">
+  <h4>Neden bu problem önemli</h4>
+  <p>Genel amaçlı sohbet botları öğrenciye müfredat dışı, bazen yanlış bilgi
+  verebiliyor ve öğretmen bunu doğrulayamıyor. Cevabı belirli bir kitabın belirli
+  bir ünitesine bağlamak, hem <b>uydurmayı engelliyor</b> hem de öğretmene
+  <b>denetlenebilirlik</b> kazandırıyor.</p>
+</div>
+
+<h2>2. Bir turun akışı</h2>
+
+<div class="akis">
+  <div class="adim"><b>1. Kayıt</b><span>Cihaz mikrofonu 16 kHz PCM yakalar, WebSocket'ten akıtır</span></div>
+  <div class="adim"><b>2. STT</b><span>Ses yazıya çevrilir (ders terimleri ipucu olarak verilir)</span></div>
+  <div class="adim"><b>3. Arama</b><span>Sınıf/ders filtresiyle hibrit arama; ilgili parçalar bulunur</span></div>
+  <div class="adim"><b>4. Cevap</b><span>LLM yalnızca bu parçalara dayanarak cevap üretir</span></div>
+  <div class="adim"><b>5. Ses</b><span>Cevap cümle cümle seslendirilip anında cihaza gönderilir</span></div>
+</div>
+
+<p>Zincirin tamamı <b>akışlıdır</b>: cevabın tamamı beklenmez. İlk cümle biter bitmez
+seslendirilip yola çıkar, kalan cümleler üretilirken cihaz zaten konuşmaktadır.
+İlk sese kadar geçen süre bu sayede <b>11 saniyeden 3 saniyeye</b> indi.</p>
+
+<h2>3. Sistem mimarisi</h2>
+
+<table>
+  <tr><th style="width:26%">Katman</th><th>İçerik</th></tr>
+  <tr><td><b>Cihaz</b></td><td>ESP32-S3 · dokunmatik ekran, mikrofon, hoparlör. Kayıt, çalma, arayüz ve WebSocket istemcisi.</td></tr>
+  <tr><td><b>Backend</b></td><td>Tek FastAPI süreci. WebSocket ağ geçidi, tur orkestrasyonu, sağlayıcı adapterleri, panel.</td></tr>
+  <tr><td><b>Bilgi tabanı</b></td><td>Qdrant vektör veritabanı — MEB kitapları parçalanmış, her parça sınıf/ders/ünite bilgisiyle etiketli.</td></tr>
+  <tr><td><b>Kayıt</b></td><td>PostgreSQL — her tur: soru, cevap, dayandığı kaynaklar, aşama gecikmeleri, kullanılan model ayarları.</td></tr>
+  <tr><td><b>Panel</b></td><td>Tarayıcıdan canlı izleme, geçmiş sohbetler ve çalışma anında ayar değişimi.</td></tr>
+</table>
+
+<h3>Bilgi tabanı</h3>
+<p><b>12 sınıf düzeyi</b> ve her sınıfta o sınıfa ait dersler indekslendi; toplam
+<b>8.577 metin parçası</b>. Her parça, ait olduğu ünite ve konu başlığıyla
+("breadcrumb") birlikte saklanıyor — cevabın kaynağını gösterebilmenin temeli bu.</p>
+
+<h2 class="yeni-sayfa">4. Kritik teknik kararlar</h2>
+
+<h3>Neden hibrit arama</h3>
+<p>Yalnızca anlamsal (vektör) arama, "yoğunluk" gibi <b>tam terim</b> aramalarında
+zayıf; yalnızca kelime tabanlı arama ise farklı ifade edilmiş soruları kaçırıyor.
+İkisi birlikte çalıştırılıp sonuçlar sıralama tabanlı birleştiriliyor (RRF).</p>
+
+<div class="kutu ders">
+  <h4>Ölçülmüş bir hata</h4>
+  <p>Kelime araması kolunun Türkçe yerine varsayılan İngilizce kök bulucuyla
+  çalıştığı fark edildi: üretilen indekslerin yalnızca <b>%42'si</b> tutuyordu, yani
+  aramanın yarısı sessizce boşa çalışıyordu. Hiçbir hata mesajı yoktu — yalnızca
+  sonuçlar biraz kötüydü.</p>
+</div>
+
+<h3>Uydurmayı engellemek: üç katman</h3>
+<p>Arama <b>hiçbir zaman "bulamadım" demez</b>; filtreye uyan en yakın parçaları her
+koşulda döndürür. Skor eşiğiyle ayırmak da işe yaramadı: kapsam dışı bir soru 0,830
+puan alırken kapsam içi bir soru 0,826 aldı. Karar zorunlu olarak modele kalıyor —
+ama prompt kuralı <b>olasılıksal</b> bir savunmadır. Bu yüzden tek katman değil üç
+katman var:</p>
+<ol>
+  <li><b>Prompt kuralı + düşük sıcaklık</b> — modelin uyma olasılığını artırır.</li>
+  <li><b>Sabit işaret (<code>KAYNAK_YOK</code>)</b> — model uyduğunda bu
+  <b>deterministik</b> olarak yakalanır. Düz metinden "bulamadım" anlamak
+  kırılgan olurdu; sabit bir işaret kararı koda taşıyor.</li>
+  <li><b>Ölçüm</b> — uyma oranı tahmin değil, sayı. Otomatik değerlendirme
+  betiği iki yönlü ölçüyor.</li>
+</ol>
+
+<div class="kutu">
+  <h4>Neden iki yönlü ölçüm</h4>
+  <p>Yalnızca kapsam dışı soruları ölçseydik, "her soruya bulamadım de" diyen bir
+  prompt metriği %100 yapardı ve asistan tamamen işe yaramaz olurdu. Bu yüzden iki
+  oran birlikte anlamlı: <b>kapsam dışı → reddetmeli</b>, <b>kapsam içi →
+  cevaplamalı.</b></p>
+</div>
+
+<h3>Takip soruları</h3>
+<p>"Bununla ilgili bir örnek verir misin?" cümlesinde <b>hiç içerik kelimesi yok.</b>
+Arama bu cümleyi olduğu gibi görürse alakasız sonuçlar döner. Çözüm: soru aramaya
+gitmeden önce, sohbet geçmişine bakan küçük bir model çağrısıyla <b>kendi başına
+anlaşılır hâle getiriliyor.</b></p>
+<p>Anahtar kelime listesi denendi ve elendi: Türkçe geçmişe sınırsız biçimde atıf
+yapıyor ("konuyla ilgili", "az önce anlattığın", "aynı konuda") ve liste hiçbir zaman
+tamamlanmıyor. Ayrıca iki hata zıt yönlere çekiyor — atfı kaçırmak boş arama, yanlış
+birleştirmek ise <b>konu değişimini yok etmek</b> demek.</p>
+
+<h3>Sözünü kesebilme (barge-in)</h3>
+<p>Cevap çalınırken panele basmak cevabı keser ve yeni soruyu başlatır. Bu, gerçek
+bir konuşmanın olmazsa olmazı; teknik olarak çalışan tur görevinin <b>iptal
+edilebilir</b> olmasını gerektiriyor. Kesilen turun duyulan kısmı hafızada
+tutuluyor — öğrencinin sonraki sorusu neredeyse her zaman ona atıfta bulunuyor.</p>
+
+<h2 class="yeni-sayfa">5. Donanım</h2>
+
+<table>
+  <tr><th style="width:30%">Bileşen</th><th>Görevi</th></tr>
+  <tr><td>ESP32-S3 (8 MB flash, 2 MB PSRAM)</td><td>Ana işlemci, Wi-Fi</td></tr>
+  <tr><td>ILI9341 2.4" dokunmatik ekran</td><td>Arayüz, bas-konuş paneli, kurulum ekranı</td></tr>
+  <tr><td>INMP441 dijital mikrofon</td><td>Ses yakalama (I2S)</td></tr>
+  <tr><td>MAX98357A + 8 Ω hoparlör</td><td>Ses çalma (I2S)</td></tr>
+  <tr><td>XPT2046 dokunmatik denetleyici</td><td>Dokunma okuma, kalibrasyon</td></tr>
+</table>
+
+<p>Cihazda <b>ses çözücü yok</b>: backend sıkıştırılmamış ses gönderiyor ve baytlar
+doğrudan donanıma yazılıyor. Bu, hem gecikmeyi düşürdü hem de cihazdan bütün bir
+kod katmanını kaldırdı.</p>
+
+<h3>Donanımda karşılaşılan sorunlar</h3>
+<p>Firmware tarafındaki hataların çoğu <b>yazılımın doğru, fiziksel katmanın eksik</b>
+olduğu durumlardı. Üç kez sebep kabloda, bileşende ya da montajdaydı — kod
+kusursuz görünüyordu.</p>
+
+<div class="kutu ders">
+  <h4>Tekrar eden ders: basit test sinyalleri asimetrik hataları gizler</h4>
+  <p>Ekran testinde düz renkler kullanıldığında görüntü doğru sanıldı; oysa satır
+  genişliği yanlıştı. Çeyreklere bölünmüş bir desen aynı hatayı <b>tek bakışta</b>
+  gösterdi. Aynı şekilde mikrofon testi yalnızca ses seviyesine baktığı için
+  sinyaldeki kaymayı gizledi — hoparlördeki cızırtının sebebi oydu.</p>
+</div>
+
+<h2>6. Ölçülen sonuçlar</h2>
+
+<table>
+  <tr><th style="width:52%">Ölçüm</th><th>Sonuç</th></tr>
+  <tr><td>İlk sese kadar geçen süre — <i>ilk ölçüm</i></td><td class="sayi">11.020 ms</td></tr>
+  <tr><td>İlk sese kadar geçen süre — <i>akışlı zincir sonrası</i></td><td class="sayi">2.697 – 3.777 ms</td></tr>
+  <tr><td>Hedef</td><td class="sayi">≤ 4.000 ms</td></tr>
+  <tr><td>Kapsam dışı soruda doğru reddetme</td><td class="sayi">6 / 6</td></tr>
+  <tr><td>Kapsam içi soruda doğru cevaplama</td><td class="sayi">6 / 6</td></tr>
+  <tr><td>Otomatik test sayısı</td><td class="sayi">37 (tamamı geçiyor)</td></tr>
+  <tr><td>İndekslenen metin parçası</td><td class="sayi">8.577</td></tr>
+</table>
+
+<p>Gecikme dört ardışık koşuda ölçüldü: <b>2697, 5592, 2717, 3777 ms.</b> Üçü hedefi
+karşıladı. Aşan koşuda tek sebep sağlayıcının o anki yavaşlığıydı (dil modelinin ilk
+kelimesi normalde 600–1000 ms iken 3378 ms'ye çıktı) — yani kendi kodumuzdan
+kaynaklanmıyordu.</p>
+
+<h2 class="yeni-sayfa">7. Mimari kararlar</h2>
+
+<p>Her karar, alternatifleri ve gerekçesiyle birlikte belgelendi. Öne çıkanlar:</p>
+
+<table>
+  <tr><th style="width:30%">Karar</th><th>Gerekçe</th></tr>
+  <tr><td>Modüler monolit</td><td>Tek eşzamanlı kullanıcı için mikroservis bölmenin karşılığı yok; tek süreç hem basit hem hızlı.</td></tr>
+  <tr><td>Bas-konuş</td><td>Kayıt ve çalma asla aynı anda olmuyor; bu sayede yankı engelleme gerekmiyor.</td></tr>
+  <tr><td>Uçtan uca akış</td><td>Gecikme hedefinin tek gerçekçi yolu. Cümle sınırında bölüp anında seslendiriyoruz.</td></tr>
+  <tr><td>İptal edilebilir tur</td><td>Söz kesme (barge-in) ancak çalışan işin iptal edilebilmesiyle mümkün.</td></tr>
+  <tr><td>Sorgu anında sınıf/ders filtresi</td><td>Öğrenci profilini değiştirdiğinde yeniden indeksleme gerekmiyor.</td></tr>
+  <tr><td>Sağlayıcı adapter arayüzleri</td><td>STT/LLM/TTS sözleşme arkasında. Sağlayıcı değişimi tek dosya; ayrıca testler <b>ücretli çağrı yapmadan</b> koşuyor.</td></tr>
+  <tr><td>Ayarlar cihaz belleğinde</td><td>Wi-Fi ve sunucu adresi ekrandan girilebiliyor; ağ değişince firmware derlemek gerekmiyor.</td></tr>
+</table>
+
+<div class="kutu">
+  <h4>Adapter kararının beklenmedik faydası</h4>
+  <p>Sağlayıcı bağımsızlığı için tasarlanmıştı. Karşılığını başka yerde verdi:
+  test kredisi bittiğinde bile <b>turun tamamı test edilebilir kaldı</b>, çünkü
+  orkestrasyon yalnızca sözleşmelerle konuşuyor.</p>
+</div>
+
+<h2>8. Öne çıkan üç hata ve çıkarılan ders</h2>
+
+<h3>Aynı değerin iki kaynağı olmamalı</h3>
+<p>Sunucu adresi iki ayrı yerden okunuyordu: bir yerde derleme zamanı sabitinden,
+başka bir yerde cihaz belleğinden. Ev ağında ikisi aynı olduğu için sorun uzun süre
+görünmedi. Ağ değişince <b>ayrıştılar</b>: cihaz çalışıyor görünürken bir özellik
+sessizce bozuldu.</p>
+
+<h3>Ölçtüğün havuz doğru havuz mu</h3>
+<p>Arayüz kütüphanesi bellek yetersizliğinden çöküyordu, ama sistem belleğinde
+30 KB boş görünüyordu. Kütüphane o belleği kullanmıyordu — kendi sabit havuzu vardı.
+<b>"Bellek var" ölçümü, ölçtüğü havuz yanlışsa hiçbir şey söylemiyor.</b></p>
+
+<h3>Her katman tek başına doğru olabilir</h3>
+<p>Dokunmatik ekran çalışmıyordu. Sürücü doğru okuyordu, dönüşüm doğruydu, arayüz
+nesneleri doğruydu — ama arayüz kütüphanesi kesme pini verildiğinde <b>yoklamayı
+bırakıyor</b>, dokunmatik yonga ise varsayılan ayarda o kesmeyi hiç üretmiyordu.
+İki makul varsayılan birleşince okuma hiç yapılmıyordu.</p>
+
+<h2>9. Mevcut durum</h2>
+
+<div class="iki">
+  <div>
+    <h3>Tamamlanan</h3>
+    <ul>
+      <li>Uçtan uca sesli tur, hedefin altında gecikmeyle</li>
+      <li>Kaynağı gösterilen, kitaba dayalı cevaplar</li>
+      <li>Takip soruları ve söz kesme</li>
+      <li>Cihazdan sınıf/ders seçimi</li>
+      <li>Cihazdan Wi-Fi ve sunucu kurulumu</li>
+      <li>Yönetim paneli: canlı izleme, geçmiş, ayarlar</li>
+      <li>Tarayıcı üzerinden yedek erişim yolu</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Bilinen sınırlar</h3>
+    <ul>
+      <li>Tek eşzamanlı kullanıcı (bilinçli kapsam kararı)</li>
+      <li>Yerel ağ, şifresiz bağlantı — sınıf ortamı varsayımı</li>
+      <li>Panel gerçek bir yetki sınırı değil, tek şifreli kapı</li>
+      <li>Bazı belirsiz sorularda cevap doğru ama "kaynak bulunamadı" etiketi yanlış konuyor</li>
+      <li>Dokunmatik klavyede Türkçe karakter yok</li>
+    </ul>
+  </div>
+</div>
+
+<h2>10. Sunumda gösterilecek akış</h2>
+
+<ol>
+  <li><b>Düz soru</b> — seçili dersten bir konu. Ekranda soru, cevap ve kaynak ünite görünür.</li>
+  <li><b>Takip sorusu</b> — "bununla ilgili bir örnek ver". Atıf çözülür, doğru kaynağa gidilir.</li>
+  <li><b>Söz kesme</b> — cevap konuşurken panele basılır; ses kesilir, yeni soru başlar.</li>
+  <li><b>Ders değiştirme</b> — cihazdan sınıf ve ders seçimi.</li>
+  <li><b>Kapsam dışı soru</b> — sistem uydurmaz, bulamadığını söyler.</li>
+  <li><b>Panel</b> — turun canlı akışı, kaynaklar, gecikmeler ve ayar değişimi.</li>
+</ol>
+
+<footer>
+  Bu belge projenin genel hatlarını anlatır. Kararların tam gerekçeleri mimari tasarım
+  dokümanında, ölçümler ve hata çözümlerinin ayrıntısı uygulama planında,
+  demo günü adımları demo kılavuzunda yer alır.
+</footer>
+
+</body>
+</html>

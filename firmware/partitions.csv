@@ -1,0 +1,18 @@
+# Bölüm tablosu — 8 MB flash (plan 3.2'de ölçülerek eklendi).
+#
+# Varsayılan tablo uygulamaya 1 MB veriyor. Yalnızca ekran + LVGL + gömülü
+# Türkçe font ile ikili 945 KB'a ulaştı: %90 dolu, 100 KB boş. Wi-Fi yığını
+# tek başına bundan fazlasını ekler, dolayısıyla 3.5'te taşardı.
+#
+# Çözüm: uygulamaya 3 MB. Kart 8 MB taşıdığı için bu bedava.
+#
+# Şimdilik tek "factory" bölümü var, ota_0/ota_1 ikilisi değil. Kablosuz
+# güncelleme demo kapsamında değil (doküman 11. bölüm sıralaması) ve OTA'ya
+# geçmek uygulama alanını ikiye böler; ihtiyaç doğarsa 3 MB'ı 2x2 MB yapmak
+# yeterli.
+
+# Name,     Type, SubType,  Offset,   Size
+nvs,        data, nvs,      0x9000,   0x6000
+phy_init,   data, phy,      0xf000,   0x1000
+factory,    app,  factory,  0x10000,  0x300000
+storage,    data, spiffs,   ,         0x100000

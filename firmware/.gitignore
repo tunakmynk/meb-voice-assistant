@@ -1,0 +1,9 @@
+# ESP-IDF derleme çıktıları
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# sdkconfig.defaults DEPOYA GİRER — o yapılandırma kararlarımızın kaydı.
+# sdkconfig ise menuconfig'in ürettiği türev dosya, girmemeli.

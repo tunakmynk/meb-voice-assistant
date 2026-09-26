@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MEB Sesli Asistan — Test</title>
+<style>
+  :root { --bg:#0f1115; --fg:#e6e8ee; --dim:#8b93a7; --line:#232838; --acc:#4c8dff; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--fg);
+         font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:19px; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:20px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  select { flex:1; min-width:170px; padding:9px 10px; background:#171b24;
+           color:var(--fg); border:1px solid var(--line); border-radius:8px; font-size:14px; }
+  #talk { width:100%; padding:22px; font-size:17px; font-weight:600; border:0;
+          border-radius:12px; background:var(--acc); color:#fff; cursor:pointer;
+          touch-action:none; user-select:none; }
+  #talk:disabled { background:#2a3242; color:var(--dim); cursor:not-allowed; }
+  #talk.rec { background:#e0483d; }
+  #state { margin:14px 0; color:var(--dim); font-size:13px; min-height:18px; }
+  .card { background:#141821; border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-top:12px; }
+  .label { color:var(--dim); font-size:11px; letter-spacing:.06em;
+           text-transform:uppercase; margin-bottom:6px; }
+  .src { color:var(--dim); font-size:12px; margin-top:10px;
+         border-top:1px solid var(--line); padding-top:8px; }
+  .warn { color:#f0b849; }
+  .err { color:#ff6b6b; }
+  #log { margin-top:18px; font:12px/1.5 ui-monospace,Consolas,monospace;
+         color:var(--dim); white-space:pre-wrap; max-height:200px; overflow:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MEB Sesli Asistan — tarayıcı testi</h1>
+  <div class="sub">Cihaz yokken aynı WebSocket sözleşmesini konuşan yedek yol (R-03).</div>
+
+  <div class="row">
+    <select id="grade"><option>Yükleniyor…</option></select>
+    <select id="subject"><option>—</option></select>
+  </div>
+
+  <button id="talk" disabled>Bas ve konuş</button>
+  <div id="state">Bağlanılıyor…</div>
+
+  <div class="card" id="qcard" hidden>
+    <div class="label">Soru</div><div id="question"></div>
+  </div>
+  <div class="card" id="acard" hidden>
+    <div class="label">Cevap</div><div id="answer"></div>
+    <div class="src" id="source" hidden></div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+const SAMPLE_RATE = 16000;   // config.audio_sample_rate ile aynı olmalı
+const $ = id => document.getElementById(id);
+const log = m => { $('log').textContent += m + '\n'; $('log').scrollTop = 1e9; };
+
+let ws, audioCtx, micStream, node, recording = false, catalog = {};
+
+/* ---------- katalog: sınıf seçilince dersler daralır (plan 0.4) ---------- */
+async function loadCatalog() {
+  const res = await fetch('/catalog');
+  catalog = (await res.json()).grades;
+  $('grade').innerHTML = Object.keys(catalog)
+    .map(g => `<option>${g}</option>`).join('');
+  syncSubjects();
+}
+function syncSubjects() {
+  const subs = catalog[$('grade').value] || [];
+  $('subject').innerHTML = subs.map(s => `<option>${s}</option>`).join('');
+}
+$('grade').onchange = syncSubjects;
+
+/* ---------- WebSocket ---------- */
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => { $('state').textContent = 'Hazır.'; $('talk').disabled = false; };
+  ws.onclose = () => { $('state').textContent = 'Bağlantı kapandı.'; $('talk').disabled = true; };
+  ws.onerror = () => log('ws error');
+
+  ws.onmessage = ev => {
+    if (ev.data instanceof ArrayBuffer) { playPcm(ev.data); return; }
+    const msg = JSON.parse(ev.data);
+    log('← ' + msg.type);
+
+    if (msg.type === 'transcript') {
+      $('qcard').hidden = false; $('question').textContent = msg.text;
+      acceptAudio = true;   // yeni tur basladi, ses yeniden kabul ediliyor
+      playAt = 0;
+      $('acard').hidden = true; $('source').hidden = true;
+    }
+    else if (msg.type === 'thinking') $('state').textContent = 'Düşünüyor…';
+    else if (msg.type === 'answer_text') {
+      $('acard').hidden = false;
+      $('answer').textContent = msg.text;
+      $('answer').className = msg.no_source ? 'warn' : '';
+      if (msg.source) {
+        $('source').hidden = false;
+        $('source').textContent =
+          `${msg.source.grade} · ${msg.source.subject} · ${msg.source.breadcrumb || ''}`;
+      }
+      $('state').textContent = 'Seslendiriliyor…';
+    }
+    else if (msg.type === 'done') {
+      const l = msg.latencies_ms || {};
+      const total = Object.values(l).reduce((a, b) => a + b, 0);
+      $('state').textContent =
+        `Bitti — toplam ${total} ms (` +
+        Object.entries(l).map(([k, v]) => `${k} ${v}`).join(', ') + ')';
+    }
+    else if (msg.type === 'cancelled') {
+      stopPlayback();
+      $('state').textContent = 'Önceki cevap kesildi.';
+    }
+    else if (msg.type === 'error') {
+      $('state').innerHTML = `<span class="err">Hata: ${msg.code} — ${msg.message}</span>`;
+    }
+  };
+}
+
+/* ---------- akışlı PCM çalma ----------
+   Backend artık mp3 değil ham PCM gönderiyor (24 kHz, mono, 16-bit): akışta
+   ilk bayt 683 ms'de çıkıyor, mp3'te 1282 ms. Karşılığında burada bir mp3
+   çözücü yok — parçaları sırayla zamanlayıp çalmamız gerekiyor.
+
+   playAt, bir sonraki parçanın başlayacağı zamanı taşır; parçalar ağdan
+   düzensiz aralıklarla gelse bile ses kesintisiz kalsın diye çalma saatini
+   ağ saatinden ayırıyoruz. */
+const TTS_RATE = 24000;
+let playCtx = null, playAt = 0;
+let queued = [];        // zamanlanmış ama henüz bitmemiş parçalar
+let acceptAudio = true; // araya girildiğinde eski turun sesini ele
+
+function playPcm(buf) {
+  // Araya girildiyse yoldaki paketleri at. Backend turu iptal etse de
+  // iptalden önce gönderilmiş baytlar hâlâ ağda olabiliyor.
+  if (!acceptAudio) return;
+  if (!playCtx) playCtx = new AudioContext();
+  const pcm = new Int16Array(buf);
+  if (!pcm.length) return;
+
+  const audioBuf = playCtx.createBuffer(1, pcm.length, TTS_RATE);
+  const ch = audioBuf.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+
+  const src = playCtx.createBufferSource();
+  src.buffer = audioBuf;
+  src.connect(playCtx.destination);
+
+  // Geciktiysek şimdiden başla, yetiştiysek sıraya ekle.
+  playAt = Math.max(playAt, playCtx.currentTime);
+  src.start(playAt);
+  playAt += audioBuf.duration;
+
+  queued.push(src);
+  src.onended = () => { queued = queued.filter(s => s !== src); };
+}
+
+/* Barge-in (ADR-04): çalmakta olan ve zamanlanmış her şeyi sustur.
+   Yalnızca playAt'i sıfırlamak yetmez — start() ile zamanlanmış parçalar
+   zaten kuyrukta, tek tek durdurulmalı. */
+function stopPlayback() {
+  acceptAudio = false;
+  for (const src of queued) { try { src.stop(); } catch (e) {} }
+  queued = [];
+  playAt = 0;
+}
+
+/* ---------- mikrofon: Float32 -> 16-bit PCM, 16 kHz ---------- */
+async function startMic() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+  });
+  audioCtx = new AudioContext();
+  const src = audioCtx.createMediaStreamSource(micStream);
+  // ScriptProcessor kullanıldı: AudioWorklet daha modern ama ayrı bir dosya
+  // gerektiriyor; bu sayfa tek dosya kalsın diye tercih edildi.
+  node = audioCtx.createScriptProcessor(4096, 1, 1);
+
+  node.onaudioprocess = e => {
+    if (!recording || ws.readyState !== 1) return;
+    ws.send(toPcm16(downsample(e.inputBuffer.getChannelData(0), audioCtx.sampleRate)));
+  };
+  src.connect(node);
+  node.connect(audioCtx.destination);
+}
+
+function downsample(input, fromRate) {
+  if (fromRate === SAMPLE_RATE) return input;
+  const ratio = fromRate / SAMPLE_RATE;
+  const out = new Float32Array(Math.round(input.length / ratio));
+  for (let i = 0; i < out.length; i++) {
+    // Aralık ortalaması: tek örnek seçmek aliasing üretir.
+    const start = Math.round(i * ratio), end = Math.min(Math.round((i + 1) * ratio), input.length);
+    let sum = 0;
+    for (let j = start; j < end; j++) sum += input[j];
+    out[i] = sum / Math.max(1, end - start);
+  }
+  return out;
+}
+
+function toPcm16(floats) {
+  const buf = new Int16Array(floats.length);
+  for (let i = 0; i < floats.length; i++) {
+    const s = Math.max(-1, Math.min(1, floats[i]));
+    buf[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return buf.buffer;
+}
+
+/* ---------- bas-konuş ---------- */
+async function press(e) {
+  e.preventDefault();
+  if (recording || ws.readyState !== 1) return;
+  // Onceki cevap hala calisiyorsa once onu kes (ADR-04).
+  stopPlayback();
+  ws.send(JSON.stringify({ type: 'cancel' }));
+
+  if (!audioCtx) { $('state').textContent = 'Mikrofon açılıyor…'; await startMic(); }
+  await audioCtx.resume();
+  recording = true;
+  $('talk').classList.add('rec');
+  $('talk').textContent = 'Kaydediyor… (bırakınca gönderilir)';
+  $('state').textContent = 'Dinliyor…';
+  ws.send(JSON.stringify({ type: 'speech_start', grade: $('grade').value, subject: $('subject').value }));
+  log('→ speech_start');
+}
+
+function release() {
+  if (!recording) return;
+  recording = false;
+  $('talk').classList.remove('rec');
+  $('talk').textContent = 'Bas ve konuş';
+  ws.send(JSON.stringify({ type: 'speech_end' }));
+  log('→ speech_end');
+  $('state').textContent = 'Yazıya çevriliyor…';
+}
+
+$('talk').addEventListener('pointerdown', press);
+$('talk').addEventListener('pointerup', release);
+$('talk').addEventListener('pointercancel', release);
+$('talk').addEventListener('pointerleave', release);
+
+loadCatalog().catch(e => $('state').innerHTML = `<span class="err">Katalog alınamadı: ${e.message}</span>`);
+connect();
+</script>
+</body>
+</html>

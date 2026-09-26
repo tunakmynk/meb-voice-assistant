@@ -1,0 +1,24 @@
+dependencies:
+  idf:
+    version: ">=5.1"
+
+  # LVGL 9 + ESP-IDF köprüsü: çerçeve tamponu tahsisi, DMA aktarımı ve
+  # LVGL zamanlayıcısını kendi görevinde çalıştırma işini üstlenir.
+  espressif/esp_lvgl_port:
+    version: "^2.3"
+
+  # ILI9341 panel sürücüsü (esp_lcd arayüzü).
+  espressif/esp_lcd_ili9341:
+    version: "^1.2"
+
+  # WebSocket istemcisi. ESP-IDF 5.x'te yerleşik DEĞİL, bileşen kayıt
+  # defterinden geliyor — sdkconfig'e yazılacak bir Kconfig anahtarı yok.
+  espressif/esp_websocket_client:
+    version: "^1.2"
+
+  # XPT2046 dokunmatik sürücüsü. DİKKAT: Espressif'in kendi deposunda YOK —
+  # "espressif/esp_lcd_touch_xpt2046" diye bir bileşen bulunmuyor ve derleme
+  # "Version solving failed" ile düşüyor. Sürücü topluluk tarafından
+  # yayınlanmış; esp_lcd_touch arayüzünü uyguluyor.
+  atanisoft/esp_lcd_touch_xpt2046:
+    version: "^1.0.6"

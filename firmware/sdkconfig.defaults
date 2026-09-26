@@ -1,0 +1,75 @@
+# ESP32-S3 N8R2 — 8 MB flash, 2 MB quad PSRAM.
+# Bu dosya "menuconfig'de şunları seçtim" demenin sürüm kontrolüne giren hâli;
+# temiz bir kopyada aynı yapılandırmayı üretir.
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# --- Flash: 8 MB ---
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# --- PSRAM: V-05'in tamamı buna bağlı ---
+# Doküman: "Dahili RAM ses tamponu, LVGL çerçeve tamponu ve TLS/WebSocket
+# tamponlarını aynı anda taşımakta zorlanır; ses tamponları PSRAM'e alınır."
+# N8R2 QUAD PSRAM kullanır — octal seçilirse kart açılmaz.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+# 16 KB altındaki tahsisler dahili RAM'de kalsın: PSRAM erişimi daha yavaş,
+# küçük ve sık kullanılan yapıları oraya atmak her şeyi yavaşlatır.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+
+# --- Bluetooth kapalı ---
+# Doküman 1. bölüm: "Kart destekliyor olsa da tüm iletişim Wi-Fi üzerinden;
+# Bluetooth yığını kapatılarak bellek ve derleme boyutu kazanılır."
+CONFIG_BT_ENABLED=n
+
+# --- Wi-Fi ---
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=8
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_TX_BUFFER_TYPE=1
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=32
+
+# NOT: esp_websocket_client ESP-IDF 5.x'te yerleşik değil, bileşen
+# kayıt defterinden gelir. 3.6'da idf_component.yml'e eklenecek; buraya
+# yazılacak bir Kconfig anahtarı yok.
+
+# --- LVGL ---
+CONFIG_LV_COLOR_DEPTH_16=y
+# LVGL 9'da LV_COLOR_16_SWAP kaldırıldı; bayt takası artık ekran sürücüsünde
+# (display.c -> .swap_bytes = true).
+# Türkçe font: lv_font_conv (node) yerine çalışma anında TTF çizimi.
+CONFIG_LV_USE_TINY_TTF=y
+CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
+
+# --- Bölüm tablosu ---
+# Varsayılan tablo uygulamaya 1 MB verir; ekran+font ile zaten %90 doluyduk.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# --- Görev yığınları ---
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# --- Log ---
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Dokunmatik: ham ADC degerleri istiyoruz. Surucunun kendi donusumu
+# (ham/4096)*genislik varsayimini yapiyor; panel gercekte ~200-3900
+# arasinda ve kaymali. Donusumu kendi kalibrasyonumuz yapiyor (touch.c).
+CONFIG_XPT2046_CONVERT_ADC_TO_COORDS=n
+
+# LVGL kendi 64 KB'lik sabit havuzunu kullaniyordu ve genisleyemiyordu
+# (LV_MEM_POOL_EXPAND_SIZE=0). lv_tiny_ttf glifleri calisma aninda O HAVUZDAN
+# ayiriyor; cizim katmanlari da oyle. Tur ekrani + 12 satirlik secim listesi
+# havuzu tuketince iki farkli sekilde patladi: stb_truetype'in
+# "stbtt__new_active" asserti ve lv_draw_layer_alloc_buf'in sonsuz yeniden
+# deneme dongusu (LVGL gorevi kilidi tutarak kilitlendi).
+#
+# CLIB malloc, LVGL'i ESP yiginina baglar. SPIRAM_USE_MALLOC zaten acik ve
+# SPIRAM_MALLOC_ALWAYSINTERNAL=16384: kucuk ayirmalar dahili RAM'i tercih
+# ediyor, buyukler (cizim katmani gibi) PSRAM'e gidiyor. Sabit 64 KB yerine
+# ~30 KB dahili + 1.6 MB PSRAM.
+CONFIG_LV_USE_CLIB_MALLOC=y

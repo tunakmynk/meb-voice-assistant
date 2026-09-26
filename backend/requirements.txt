@@ -1,0 +1,22 @@
+# Web katmanı — tek async süreç (ADR-01)
+fastapi>=0.115
+uvicorn[standard]>=0.32
+jinja2>=3.1
+python-multipart>=0.0.12
+
+# Yapılandırma
+pydantic>=2.9
+pydantic-settings>=2.6
+
+# Sağlayıcı adapter'ları (ADR-08)
+openai>=1.60
+
+# Retrieval — hibrit arama (dense + sparse)
+qdrant-client>=1.12
+fastembed>=0.4          # intfloat/multilingual-e5-large + Qdrant/bm25
+
+# Kalıcılık (ADR-07)
+asyncpg>=0.30
+
+# Test
+pytest>=8.3
