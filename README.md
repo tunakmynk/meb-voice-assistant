@@ -1,127 +1,121 @@
-# Curriculum-Grounded Voice AI Assistant
+[English](README.md) | [Türkçe](README.tr.md)
 
-A push-to-talk device that answers students' questions out loud from Turkish
-national curriculum (MEB) textbooks and shows the source of each answer.
-Built during my THINKBRO internship (Jul–Sep 2026) with Claude Code as the main
-coding tool. The knowledge base was built as a team effort.
+# Curriculum-Grounded, RAG-Backed Voice AI Assistant
 
-- **Stack:** Python, FastAPI, WebSocket, PostgreSQL, Qdrant, Docker Compose, ESP32-S3 (ESP-IDF)
-- **Latency:** time to first audio fell from 11.0 s to 2.7–3.8 s in 3 of 4 measured runs
-- **Evaluation:** 6/6 correct refusals out of scope, 6/6 correct answers in scope
-- **Tests:** 37 pytest tests; most use an in-memory store rather than a real database
+A standalone device that lets students ask questions out loud and get spoken
+answers from their own textbook. THINKBRO internship, July – September 2026.
 
-The rest of this README is in Turkish.
-Case study and demo: https://tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant/
+Claude Code was my main coding tool. The textbook data was cleaned and chunked
+as a team effort, and another team produced the vectors.
 
----
+The student holds down the panel on the device, asks a question and lets go.
+Within a few seconds they hear the answer and see on screen which unit it came
+from.
 
-# MEB Kaynaklı, RAG Destekli Sesli AI Asistan
+The answer is generated from the MEB (Turkish national curriculum) textbook for
+the student's own grade, not from a general language model. If the topic is not
+in the book, the system does not make something up; it says it could not find
+it. This is the project's defining claim: not just a correct answer, but **an
+answer whose source can be shown**.
 
-Öğrencinin kendi ders kitabından konuşarak cevap alabildiği bağımsız cihaz.
-THINKBRO stajı, Temmuz – Eylül 2026.
-
-Öğrenci cihazdaki panele basılı tutar, sorusunu sorar, bırakır. Birkaç saniye
-içinde sesli cevabı duyar ve ekranda cevabın hangi üniteden geldiğini görür.
-
-Cevap genel bir dil modelinden değil, öğrencinin kendi sınıfına ait MEB ders
-kitabından üretilir. Konu kitapta yoksa sistem uydurmaz, bulamadığını söyler.
-Projenin ayırt edici iddiası budur: doğru cevap değil, **kaynağı gösterilebilir
-cevap**.
-
-> Vaka analizi, fotoğraflar ve sesli demo:
+> Case study, photos and voice demo:
 > [tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant](https://tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant/)
 
-## Ölçülen sonuçlar
+## Measured results
 
-| Ölçüm | Sonuç |
+| Measurement | Result |
 |---|---|
-| İlk sese kadar geçen süre — ilk ölçüm | 11.020 ms |
-| İlk sese kadar — akışlı zincirden sonra | 2.697 – 3.777 ms |
-| Kapsam dışı soruda doğru reddetme | 6 / 6 |
-| Kapsam içi soruda doğru cevaplama | 6 / 6 |
-| Otomatik test | 37, tamamı geçiyor |
-| İndekslenen metin parçası | 8.577 (12 sınıf düzeyi) |
+| Time to first audio, first measurement | 11,020 ms |
+| Time to first audio, after the streaming chain | 2,697 – 3,777 ms |
+| Correct refusals on out-of-scope questions | 6 / 6 |
+| Correct answers on in-scope questions | 6 / 6 |
+| Automated tests | 37, all passing |
+| Indexed text chunks | 8,577 (12 grade levels) |
 
-Gecikme dört ardışık koşuda ölçüldü: 2697, 5592, 2717 ve 3777 ms. Üçü hedefi
-karşıladı; aşan koşuda sebep sağlayıcının o günkü yavaşlığıydı (dil modelinin
-ilk kelimesi normalde 600–1000 ms sürerken 3378 ms'ye çıktı).
+Latency was measured over four consecutive runs: 2697, 5592, 2717 and 3777 ms.
+Three met the target. The run that missed it was caused by the provider being
+slow that day (the language model's first token, normally 600–1000 ms, rose to
+3378 ms).
 
-## Bir turun akışı
+## How a turn works
 
 ```
-Kayıt          →  STT         →  Arama          →  Cevap          →  Ses
-16 kHz PCM,       ses yazıya     sınıf/ders        LLM yalnızca      cümle cümle
-WebSocket'ten     çevrilir       filtresiyle       bu parçalara      seslendirilip
-akar                             hibrit arama      dayanır           anında gönderilir
+Recording      →  STT         →  Search         →  Answer         →  Audio
+16 kHz PCM,       speech is      hybrid search     LLM relies only   spoken sentence
+streamed over     transcribed    filtered by       on these chunks   by sentence and
+WebSocket                        grade/subject                       sent right away
 ```
 
-Zincirin tamamı akışlıdır: cevabın tamamı beklenmez. İlk cümle biter bitmez
-seslendirilip yola çıkar, kalan cümleler üretilirken cihaz zaten konuşmaktadır.
+The whole chain is streaming, so nothing waits for the full answer. As soon as
+the first sentence is finished it is spoken and sent, and the device is already
+talking while the remaining sentences are generated.
 
-## Mimari
+## Architecture
 
-| Katman | İçerik |
+| Layer | Contents |
 |---|---|
-| Cihaz | ESP32-S3. Kayıt, çalma, arayüz ve WebSocket istemcisi. |
-| Backend | Tek FastAPI süreci: WebSocket ağ geçidi, tur orkestrasyonu, sağlayıcı adapterleri, panel. |
-| Bilgi tabanı | Qdrant — MEB kitapları parçalanmış, her parça sınıf/ders/ünite bilgisiyle etiketli. |
-| Kayıt | PostgreSQL — her tur: soru, cevap, dayandığı kaynaklar, aşama gecikmeleri, model ayarları. |
-| Panel | Tarayıcıdan canlı izleme, geçmiş sohbetler, çalışma anında ayar değişimi. |
+| Device | ESP32-S3. Recording, playback, UI and WebSocket client. |
+| Backend | A single FastAPI process: WebSocket gateway, turn orchestration, provider adapters, panel. |
+| Knowledge base | Qdrant. MEB textbooks are chunked, and each chunk is tagged with grade, subject and unit. |
+| Persistence | PostgreSQL. For each turn: question, answer, the sources it relied on, stage latencies, model settings. |
+| Panel | Live monitoring from the browser, past conversations, settings changes at runtime. |
 
-## Donanım
+## Hardware
 
-| Bileşen | Görevi | Arayüz |
+| Component | Role | Interface |
 |---|---|---|
-| ESP32-S3 (8 MB flash, 2 MB PSRAM) | Ana işlemci, Wi-Fi | — |
-| ILI9341 2.4" dokunmatik ekran | Arayüz, bas-konuş paneli | SPI |
-| XPT2046 | Dokunma okuma, kalibrasyon | SPI |
-| INMP441 | Ses yakalama | I2S |
-| MAX98357A + 8 Ω hoparlör | Ses çalma | I2S |
+| ESP32-S3 (8 MB flash, 2 MB PSRAM) | Main processor, Wi-Fi | — |
+| ILI9341 2.4" touch display | UI, push-to-talk panel | SPI |
+| XPT2046 | Touch reading, calibration | SPI |
+| INMP441 | Audio capture | I2S |
+| MAX98357A + 8 Ω speaker | Audio playback | I2S |
 
-Cihazda ses çözücü yok: backend sıkıştırılmamış ses gönderiyor ve baytlar
-doğrudan donanıma yazılıyor. Bu hem gecikmeyi düşürdü hem de cihazdan bütün
-bir kod katmanını kaldırdı.
+There is no audio decoder on the device: the backend sends uncompressed audio
+and the bytes are written straight to the hardware. This lowered latency and
+removed a whole layer of code from the device.
 
-## Çalıştırma
+## Running it
 
-Gereksinimler: Docker Desktop, Python 3.12+, firmware için ESP-IDF.
+Requirements: Docker Desktop, Python 3.12+, and ESP-IDF for the firmware.
 
-### 1. Durum tutan servisler
+### 1. Stateful services
 
 ```bash
 docker compose up -d
 ```
 
-Qdrant `:6333` (panel: http://localhost:6333/dashboard), PostgreSQL `:5432`.
-Şema `backend/db/init/001_schema.sql` ile konteyner ilk açılışta kurulur.
+Qdrant runs on `:6333` (dashboard: http://localhost:6333/dashboard) and
+PostgreSQL on `:5432`. The schema is created from
+`backend/db/init/001_schema.sql` when the container first starts.
 
 ### 2. Backend
 
 ```bash
-cp backend/.env.example backend/.env    # doldur: OPENAI_API_KEY, QDRANT_URL, POSTGRES_DSN, PANEL_PASSWORD
+cp backend/.env.example backend/.env    # fill in: OPENAI_API_KEY, QDRANT_URL, POSTGRES_DSN, PANEL_PASSWORD
 python -m venv backend/.venv
 backend/.venv/Scripts/pip install -r backend/requirements.txt
 ```
 
-Başlatmak için, proje kökünden:
+To start it, from the project root:
 
 ```
-backend\baslat.bat          :: demo modu
-backend\baslat.bat izle     :: --reload, prompt üzerinde çalışırken
+backend\baslat.bat          :: demo mode
+backend\baslat.bat izle     :: --reload, for working on the prompt
 ```
 
-`baslat.bat` aynı portu dinleyen eski süreci önce kapatır. Bu tesadüfi değil:
-`--reload` olmadan uvicorn modülü açılışta bir kez içe aktarıp bellekte tutuyor,
-dolayısıyla `llm.py` içindeki prompt değişikliği çalışan sunucuyu etkilemiyor ve
-bu hiçbir yerde hata vermiyor — cihaz eski promptla konuşmaya devam ediyor.
+`baslat.bat` first stops any old process listening on the same port. This is
+deliberate: without `--reload`, uvicorn imports the module once at startup and
+keeps it in memory. A prompt change in `llm.py` therefore does not affect the
+running server, and nothing reports an error: the device simply keeps talking
+with the old prompt.
 
-### 3. Bilgi tabanı
+### 3. Knowledge base
 
-**Vektör verisi bu depoda yok.** Üretilmiş veri olduğu ve MEB ders kitaplarının
-metin parçalarını içerdiği için dışarıda tutuldu.
+**The vector data is not in this repository.** It is generated data and contains
+text chunks from MEB textbooks, so it was kept out.
 
-`scripts/ingest_qdrant.py` yalnızca parquet → Qdrant aktarımını yapar; dense ve
-sparse vektörlerin hesaplanmış olmasını bekler:
+`scripts/ingest_qdrant.py` only handles the parquet → Qdrant transfer and expects
+the dense and sparse vectors to be computed already:
 
 ```bash
 cd backend
@@ -129,10 +123,10 @@ cd backend
 .venv\Scripts\python.exe scripts\ingest_qdrant.py --recreate
 ```
 
-Bunun girdisi olan `vectors/v2/**/*.parquet` dosyalarını üreten çevrimdışı hat
-(Docling → Chonkie → FastEmbed) bu depoda bulunmuyor. Yani depo tek başına
-klonlanarak bilgi tabanı sıfırdan kurulamaz; parquet dosyalarının ayrıca
-sağlanması gerekir.
+The offline pipeline that produces its input, the `vectors/v2/**/*.parquet` files
+(Docling → Chonkie → FastEmbed), is not in this repository. Cloning the repository
+alone is not enough to rebuild the knowledge base from scratch; the parquet files
+must be supplied separately.
 
 ### 4. Firmware
 
@@ -141,41 +135,43 @@ firmware\derle.bat
 firmware\derle.bat flash monitor
 ```
 
-> **Uyarı:** `derle.bat` ve `baslat.bat`, geliştirme makinesine ait mutlak
-> yollar içeriyor (ESP-IDF konumu, Python yolu). Başka bir makinede çalıştırmadan
-> önce bu satırlar güncellenmeli.
+> **Warning:** `derle.bat` and `baslat.bat` contain absolute paths from the
+> development machine (ESP-IDF location, Python path). Update those lines before
+> running them on another machine.
 
-## Depo düzeni
+## Repository layout
 
 ```
 backend/
 ├── app/
-│   ├── adapters/       STT · LLM · TTS, sözleşme arkasında (sağlayıcı değişimi tek dosya)
-│   ├── gateway/        WebSocket ağ geçidi
-│   ├── orchestrator/   tur akışı, iptal edilebilir asyncio görevleri
-│   ├── rag/            hibrit arama, RRF birleştirme
-│   ├── conversation/   takip sorusu çözümleme, sohbet geçmişi
-│   └── panel/          yönetim paneli (sunucu taraflı şablon + SSE)
-├── db/init/            PostgreSQL şeması
-├── scripts/            ingest, uçtan uca testler, değerlendirme betikleri
+│   ├── adapters/       STT · LLM · TTS behind a contract (changing a provider touches one file)
+│   ├── gateway/        WebSocket gateway
+│   ├── orchestrator/   turn flow, cancellable asyncio tasks
+│   ├── rag/            hybrid search, RRF fusion
+│   ├── conversation/   follow-up question resolution, conversation history
+│   └── panel/          admin panel (server-side templates + SSE)
+├── db/init/            PostgreSQL schema
+├── scripts/            ingest, end-to-end tests, evaluation scripts
 └── tests/
-firmware/               ESP-IDF projesi (main/, sdkconfig, partitions.csv)
-docs/                   proje özeti, uygulama planı, demo kılavuzu, manuel test
+firmware/               ESP-IDF project (main/, sdkconfig, partitions.csv)
+docs/                   project summary, implementation plan, demo guide, manual tests
 ```
 
-## Bilinen sınırlar
+## Known limits
 
-- Tek eşzamanlı kullanıcı — bilinçli bir kapsam kararı.
-- Yerel ağ, şifresiz bağlantı; sınıf ortamı varsayımı.
-- Panel gerçek bir yetki sınırı değil, tek şifreli bir kapı.
-- Dokunmatik klavyede Türkçe karakter yok.
+- One concurrent user: a deliberate scope decision.
+- Local network with unencrypted connections, assuming a classroom setting.
+- The panel is not a real authorization boundary, just a single-password gate.
+- The on-screen keyboard has no Turkish characters.
 
-## Dokümanlar
+## Documents
 
-| Dosya | İçerik |
+These documents are in Turkish.
+
+| File | Contents |
 |---|---|
-| [docs/proje-ozeti.pdf](docs/proje-ozeti.pdf) | Proje özeti ve teknik rapor |
-| [docs/uygulama-plani.md](docs/uygulama-plani.md) | Ölçümler, hata çözümlerinin ayrıntısı |
-| [docs/demo-kilavuzu.md](docs/demo-kilavuzu.md) | Demo günü adımları |
-| [docs/manuel-test.md](docs/manuel-test.md) | Elle test senaryoları |
-| [Mimari_Tasarim_Dokumani.md](MEB%20KAYNAKLI%20VE%20RAG%20DESTEKL%C4%B0%20SESL%C4%B0%20AI%20AS%C4%B0STAN%20Mimari_Tasarim_Dokumani.md) | Kararların tam gerekçeleri (ADR'ler) |
+| [docs/proje-ozeti.pdf](docs/proje-ozeti.pdf) | Project summary and technical report |
+| [docs/uygulama-plani.md](docs/uygulama-plani.md) | Measurements and details of the bug fixes |
+| [docs/demo-kilavuzu.md](docs/demo-kilavuzu.md) | Demo day steps |
+| [docs/manuel-test.md](docs/manuel-test.md) | Manual test scenarios |
+| [Mimari_Tasarim_Dokumani.md](MEB%20KAYNAKLI%20VE%20RAG%20DESTEKL%C4%B0%20SESL%C4%B0%20AI%20AS%C4%B0STAN%20Mimari_Tasarim_Dokumani.md) | Full reasoning behind the decisions (ADRs) |
