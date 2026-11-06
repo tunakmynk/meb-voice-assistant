@@ -1,3 +1,20 @@
+# Curriculum-Grounded Voice AI Assistant
+
+A push-to-talk device that answers students' questions out loud from Turkish
+national curriculum (MEB) textbooks and shows the source of each answer.
+Built during my THINKBRO internship (Jul–Sep 2026) with Claude Code as the main
+coding tool. The knowledge base was built as a team effort.
+
+- **Stack:** Python, FastAPI, WebSocket, PostgreSQL, Qdrant, Docker Compose, ESP32-S3 (ESP-IDF)
+- **Latency:** time to first audio fell from 11.0 s to 2.7–3.8 s in 3 of 4 measured runs
+- **Evaluation:** 6/6 correct refusals out of scope, 6/6 correct answers in scope
+- **Tests:** 37 pytest tests; most use an in-memory store rather than a real database
+
+The rest of this README is in Turkish.
+Case study and demo: https://tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant/
+
+---
+
 # MEB Kaynaklı, RAG Destekli Sesli AI Asistan
 
 Öğrencinin kendi ders kitabından konuşarak cevap alabildiği bağımsız cihaz.
@@ -12,7 +29,7 @@ Projenin ayırt edici iddiası budur: doğru cevap değil, **kaynağı gösteril
 cevap**.
 
 > Vaka analizi, fotoğraflar ve sesli demo:
-> [tunakimyonok.vercel.app/tr/projects/meb-voice-assistant](https://tunakimyonok.vercel.app/tr/projects/meb-voice-assistant/)
+> [tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant](https://tunakimyonok-portfolio.vercel.app/projects/meb-voice-assistant/)
 
 ## Ölçülen sonuçlar
 
